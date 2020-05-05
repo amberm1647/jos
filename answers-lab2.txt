@@ -1,0 +1,40 @@
+2.
+
+|   Entry   |   Base VA    |    Points to (logically)        |
+|------------------------------------------------------------|
+|   1023    |  0xffc00000  | PT for top 4MB of phys mem      |
+|   1022    |  0xff800000  | PT for 2nd top 4MB of phys mem  |
+|   ...     |     ...      |            ...                  |
+|   960     |  0xf0000000  | PT for bottom 4MB of phys mem   |
+|   959     |  0xefc00000  | PT for bootstack                |
+|   958     |  0xef800000  | memory-mapped IO                |
+|   957     |  0xef400000  | current page table              |
+|   956     |  0xef000000  | pages data structure            |
+|   ...     |     ...      |            ...                  |
+|   2       |  0x00800000  | unmapped                        |
+|   1       |  0x00400000  | unmapped                        |
+|   0       |  0x00000000  | unmapped                        |
+
+3. kernel memory is protected by permission bits, which are set in the
+PTE/PDE flags in the last 12 bits of the entries. the current privilege
+level is stored in the last 2 bits of the CS register. when the CPL == 0,
+that indicates OS level privilege, and when CPL == 3, that indicates user
+level privilege. the CPL is compared to the permissions bits accordingly
+
+
+4. JOS maps physical memory 1-to-1 from virtual address 0xf0000000 to
+0xffffffff, which is 256MB of physical memory in total
+
+
+5. there is one page directory and 1024 page tables. each is 4KB, so
+1024 * 4KB + 4KB = 4.1MB
+
+
+6. eip transitions to above KERNBASE right before the "relocated" subroutine
+in entry.S. between enabling paging and running eip above KERNBASE, it is
+possible to continue executing at a low eip because VAs [0, 4MB) are also
+mapped to PAs [0, 4MB). the transition is necessary because the first 4MB of
+physical memory, [0, 4MB), is mapped to the first 4MB of virtual addresses
+starting at KERNBASE, [KERNBASE, KERNBASE+4MB). after kern_pgdir is loaded,
+the VAs [0, 4MB) are no longer mapped PAs [0, 4MB).
+
