@@ -97,7 +97,7 @@ boot_alloc(uint32_t n)
 	// to any kernel code or global variables.
 	if (!nextfree) {
 		extern char end[];
-		nextfree = ROUNDUP((char *) end, PGSIZE);
+		nextfree = ROUNDUP((char *) end+1, PGSIZE);
 	}
 
 	// Allocate a chunk large enough to hold 'n' bytes, then update
@@ -170,6 +170,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+    envs = boot_alloc(NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -194,6 +195,7 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
     boot_map_region(kern_pgdir, UPAGES, npages*sizeof(struct PageInfo), PADDR(pages), PTE_U | PTE_P);
+    boot_map_region(kern_pgdir, (uintptr_t) pages, npages*sizeof(struct PageInfo), PADDR(pages), PTE_W | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
@@ -202,6 +204,7 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+    boot_map_region(kern_pgdir, UENVS, NENV*sizeof(struct Env), PADDR(envs), PTE_U | PTE_P);
 
     //////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -291,7 +294,7 @@ page_init(void)
     pages[0].pp_ref = 0xffff;
     //cprintf("pa of page 0: %p\n", page2pa(pages));
     //cprintf("va of page 0: %p\n", KADDR(page2pa(pages)));
-    cprintf("value at pages: %p\n", pages);
+    //cprintf("value at pages: %p\n", pages);
     //cprintf("address of pages: %p\n", &pages);
 
     for (i = 1; i < npages_basemem; i++) {
@@ -424,8 +427,8 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
         pp_page_table->pp_ref += 1;
         pgdir[PDX(va)] = page2pa(pp_page_table) | PTE_P | PTE_U | PTE_W;
 
-        if (PDX(va) == 0)
-            cprintf(">>>pgdir[0] = %p\n", pgdir[0]);
+        //if (PDX(va) == 0)
+            //cprintf(">>>pgdir[0] = %p\n", pgdir[0]);
 
         pde_t *page_table = (pde_t *) KADDR(PTE_ADDR(pgdir[PDX(va)]));
         //cprintf("debug 2: \n");
@@ -544,9 +547,9 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
     if (pte_store)
         *pte_store = p_pte;
 
-    cprintf("page_lookup p_pte: %p\n", p_pte);
-    cprintf("page_lookup *p_pte: %p\n", *p_pte);
-    cprintf("page_lookup pa: %p\n", PTE_ADDR(*p_pte));
+    //cprintf("page_lookup p_pte: %p\n", p_pte);
+    //cprintf("page_lookup *p_pte: %p\n", *p_pte);
+    //cprintf("page_lookup pa: %p\n", PTE_ADDR(*p_pte));
 
     //volatile struct PageInfo *result = pa2page(PTE_ADDR(*p_pte));
     //cprintf("result = %p\n", result);
