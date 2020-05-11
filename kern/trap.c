@@ -69,15 +69,22 @@ void t_oflow();
 void t_bound();
 void t_illop();
 void t_device();
+
 void t_dblflt();
+
 void t_tss();
 void t_segnp();
 void t_stack();
 void t_gpflt();
+void t_pgflt();
+
 void t_fperr();
+
 void t_align();
+
 void t_mchk();
 void t_simderr();
+
 void t_syscall();
 
 void
@@ -110,6 +117,7 @@ trap_init(void)
     SETGATE(idt[T_SEGNP], 0, GD_KT, t_segnp, 0);
     SETGATE(idt[T_STACK], 0, GD_KT, t_stack, 0);
     SETGATE(idt[T_GPFLT], 0, GD_KT, t_gpflt, 0);
+    SETGATE(idt[T_PGFLT], 0, GD_KT, t_pgflt, 0);
 
     SETGATE(idt[T_FPERR], 0, GD_KT, t_fperr, 0);
 
@@ -198,25 +206,32 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+    cprintf("  trap no %d from eip %p\n", tf->tf_trapno, tf->tf_eip);
     switch (tf->tf_trapno) {
         case T_PGFLT:
         {
-            //handle
+            return page_fault_handler(tf);
         }
         case T_BRKPT:
         {
-            //handle
+            return monitor(tf);
         }
         case T_SYSCALL:
         {
-            //handle
+            int32_t ret = syscall(tf->tf_regs.reg_eax,
+                    tf->tf_regs.reg_edx,
+                    tf->tf_regs.reg_ecx,
+                    tf->tf_regs.reg_ebx,
+                    tf->tf_regs.reg_edi,
+                    tf->tf_regs.reg_esi
+                    );
+            tf->tf_regs.reg_eax = ret;
+            return;
         }
         default:
         {
         }
     }
-
-
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -278,6 +293,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+    if ((tf->tf_cs & 0x3) == 0)
+        panic("kernel page fault\n");
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
