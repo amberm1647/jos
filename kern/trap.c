@@ -206,7 +206,7 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-    cprintf("  trap no %d from eip %p\n", tf->tf_trapno, tf->tf_eip);
+    //cprintf("  trap no %d from eip %p\n", tf->tf_trapno, tf->tf_eip);
     switch (tf->tf_trapno) {
         case T_PGFLT:
         {

@@ -76,28 +76,28 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	switch (syscallno) {
 	    case SYS_cputs:
         {
-            cprintf("   SYS_cputs\n");
+            //cprintf("   SYS_cputs\n");
             sys_cputs((const char *) a1, (size_t) a2);
             return 0;
         }
         case SYS_cgetc:
         {
-            cprintf("   SYS_cgetc\n");
+            //cprintf("   SYS_cgetc\n");
             return (int32_t) sys_cgetc();
         }
         case SYS_getenvid:
         {
-            cprintf("   SYS_getenvid\n");
+            //cprintf("   SYS_getenvid\n");
             return (int32_t) sys_getenvid();
         }
         case SYS_env_destroy:
         {
-            cprintf("   SYS_env_destroy\n");
+            //cprintf("   SYS_env_destroy\n");
             return (int32_t) sys_env_destroy((envid_t) a1);
         }
         default:
         {
-            cprintf("   -E_INVAL\n");
+            //cprintf("   -E_INVAL\n");
             return -E_INVAL;
         }
 	}
