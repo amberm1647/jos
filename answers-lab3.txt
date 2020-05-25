@@ -1,0 +1,17 @@
+1. having individual handler functions for each exception/interrupt allows
+each error to be distinguished. this is important especially since some
+exceptions/interrupts have error codes and some do not
+
+2. I did not have to do anything to make user/softint behave correctly. the
+user program does not have the kernel privileges necessary to invoke a kernel
+page fault, so it generates a general protection fault. if the user program
+was allowed to invoke kernel page faults, it could be taken advantage of by
+malicious user programs
+
+3. the breakpoint entry was set up with user privileges, allowing user
+programs to cause a breakpoint trap. if the breakpoint entry was set up for
+kernel privileges only, it would cause a general protection fault instead.
+
+4. the point of these mechanisms is to create a call gate to control access
+to ring 0, which prevents user programs from arbitrarily causing exceptions or
+interrupts to try to execute malicious code
