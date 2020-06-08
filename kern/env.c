@@ -80,7 +80,7 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 	// If envid is zero, return the current environment.
 	if (envid == 0) {
 		*env_store = curenv;
-		return 0;
+        return 0;
 	}
 
 	// Look up the Env structure via the index part of the envid,
@@ -91,7 +91,7 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 	e = &envs[ENVX(envid)];
 	if (e->env_status == ENV_FREE || e->env_id != envid) {
 		*env_store = 0;
-		return -E_BAD_ENV;
+        return -E_BAD_ENV;
 	}
 
 	// Check that the calling environment has legitimate permission
@@ -101,7 +101,7 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 	// or an immediate child of the current environment.
 	if (checkperm && e != curenv && e->env_parent_id != curenv->env_id) {
 		*env_store = 0;
-		return -E_BAD_ENV;
+        return -E_BAD_ENV;
 	}
 
 	*env_store = e;
@@ -259,6 +259,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
+    e->env_tf.tf_eflags |= FL_IF;
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -465,6 +466,7 @@ env_free(struct Env *e)
 	e->env_status = ENV_FREE;
 	e->env_link = env_free_list;
 	env_free_list = e;
+
 }
 
 //
@@ -544,14 +546,16 @@ env_run(struct Env *e)
 	// LAB 3: Your code here.
 
 	//panic("env_run not yet implemented");
-    if (curenv && curenv->env_status == ENV_RUNNING)
+    if (curenv && (curenv->env_status == ENV_RUNNING)) {
         curenv->env_status = ENV_RUNNABLE;
+    }
 
     curenv = e;
     curenv->env_status = ENV_RUNNING;
     curenv->env_runs++;
     lcr3(PADDR(curenv->env_pgdir));
 
+    unlock_kernel();
     env_pop_tf(&curenv->env_tf);
 }
 

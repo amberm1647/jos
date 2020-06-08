@@ -1,0 +1,22 @@
+1. MPBOOTPHYS is used to calculate absolute addresses rather than relying on the
+linker to fill them. it is necessary in kern/mpentry.S because the code runs
+from an address in the low 2^16 bytes of memory but is linked at a high virtual
+address above KERNBASE, while boot/boot.S is both linked and loaded by the BIOS
+the low address 0x7c00.
+
+2. we need separate kernel stacks for each CPU because the kernel lock is not
+acquired when pushing a trapframe onto the stack during an interrupt or trap.
+for example, if a CPU acquires the lock when a trap happens in user mode, and a
+second CPU also tries to acquire the lock, it will wait for the first CPU to
+release the lock, but it will push its trapframe onto the stack, on top of the
+trapframe pushed by the first CPU. so when the first CPU pops a trapframe off
+the stack, it gets the second CPU's trapframe, not its own.
+
+3. when a new env is created, env_setup_vm copies the page directory above UTOP
+directly from kern_pgdir, so the virtual address space of all envs above UTOP
+is identical. the envs array is mapped to UENVS which is above UTOP, so that
+mapping is copied to every env, thus the pointer e can be dereferenced
+before and after the addressing switch.
+
+4. the old environment's registers are saved in a trapframe and pushed onto the
+stack by alltraps, which are restored when env_pop_tf() is called from env_run().

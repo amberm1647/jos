@@ -282,6 +282,11 @@ mem_init_mp(void)
 	//
 	// LAB 4: Your code here:
 
+    int i;
+    for (i = 0; i < NCPU; i++) {
+        uintptr_t kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+        boot_map_region(kern_pgdir, kstacktop_i - KSTKSIZE, KSTKSIZE, PADDR(&percpu_kstacks[i]), PTE_P | PTE_W);
+    }
 }
 
 // --------------------------------------------------------------
@@ -326,10 +331,6 @@ page_init(void)
     page_free_list = NULL;
 
     pages[0].pp_ref = 0xffff;
-    //cprintf("pa of page 0: %p\n", page2pa(pages));
-    //cprintf("va of page 0: %p\n", KADDR(page2pa(pages)));
-    //cprintf("value at pages: %p\n", pages);
-    //cprintf("address of pages: %p\n", &pages);
 
     for (i = 1; i < npages_basemem; i++) {
         pages[i].pp_ref = 0;
@@ -343,7 +344,9 @@ page_init(void)
         pages[i].pp_ref = 0;
     }
 
-	for (i = 1; i < npages; i++) {
+    pages[PGNUM(MPENTRY_PADDR)].pp_ref = 1;
+
+    for (i = 1; i < npages; i++) {
 		if (pages[i].pp_ref == 0) {
             pages[i].pp_link = page_free_list;
 		    page_free_list = &pages[i];
@@ -398,7 +401,6 @@ page_free(struct PageInfo *pp)
 
     pp->pp_link = page_free_list;
     page_free_list = pp;
-    //assert(page_free_list != pages);
 }
 
 //
@@ -439,44 +441,22 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
     pde_t pde = pgdir[PDX(va)];
-    //cprintf("pgdir_walk va: %p\n", va);
     if (pde & PTE_P) {
         pde_t *page_table = (pde_t *) KADDR(PTE_ADDR(pde));
-
-        //cprintf("debug 1: \n");
-        //cprintf("pgdir_walk pte_t addr: %p\n", &page_table[PTX(va)]);
-        //cprintf("pgdir_walk pte_t val: %p\n", page_table[PTX(va)]);
-        //cprintf("PTX(va): %d\n", PTX(va));
-        //cprintf("page_table[0]: %p\n", page_table[0]);
-        //cprintf("page_table[1]: %p\n", page_table[1]);
-        //cprintf("      page_table addr: %p\n", page_table);
         return &page_table[PTX(va)];
     }
     else if (create) {
         struct PageInfo *pp_page_table = page_alloc(ALLOC_ZERO);
         if (!pp_page_table) {
-            //cprintf("pgdir_walk(): page table page dne, alloc failed\n");
             return NULL;
         }
         pp_page_table->pp_ref += 1;
         pgdir[PDX(va)] = page2pa(pp_page_table) | PTE_P | PTE_U | PTE_W;
 
-        //if (PDX(va) == 0)
-            //cprintf(">>>pgdir[0] = %p\n", pgdir[0]);
-
         pde_t *page_table = (pde_t *) KADDR(PTE_ADDR(pgdir[PDX(va)]));
-        //cprintf("debug 2: \n");
-        //cprintf("pa of new page table: %p\n", page2pa(pp_page_table));
-        //cprintf("pgdir_walk pte_t addr: %p\n", &page_table[PTX(va)]);
-        //cprintf("pgdir_walk pte_t val: %p\n", page_table[PTX(va)]);
-        //cprintf("PTX(va): %d\n", PTX(va));
-        //cprintf("page_table[0]: %p\n", page_table[0]);
-        //cprintf("page_table[1]: %p\n", page_table[1]);
-        //cprintf("      page_table addr: %p\n", page_table);
         return &page_table[PTX(va)];
     }
     else {
-        //cprintf("debug 3: \n");
         return NULL;
     }
 }
@@ -497,7 +477,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 {
 	// Fill this function in
     uint32_t i;
-    for (i = 0; i <= size; i += PGSIZE) {
+    for (i = 0; i < size; i += PGSIZE) {
         pte_t *p_pte = pgdir_walk(pgdir, (const void *) va+i, 1);
         *p_pte = PTE_ADDR(pa+i) | PTE_P | perm;
     }
@@ -532,25 +512,12 @@ int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
-    //cprintf("page_insert va: %p\n", va);
-    //cprintf(" page_insert(): trying to map %p to va %p\n", pp, va);
     pte_t *p_pte = pgdir_walk(pgdir, va, 1);
-    //cprintf(" page_insert p_pte: %p\n", p_pte);
     if (!p_pte) {
-        //cprintf("  >page_insert(): no mem error\n");
         return -E_NO_MEM;
     }
 
     pp->pp_ref++;
-/*
-    struct PageInfo *va_lookup = page_lookup(pgdir, va, 0);
-    cprintf("calling page_lookup from page_insert\n");
-    if (va_lookup) {
-        cprintf("page %p already mapped at va %p, removing\n", va_lookup, va);
-        print_page(va_lookup);
-
-    }
-*/
     page_remove(pgdir, va);
     *p_pte = PTE_ADDR(page2pa(pp)) | perm | PTE_P;
 	return 0;
@@ -572,21 +539,13 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
 	//return NULL;
-    //cprintf("page_lookup va: %p\n", va);
     pte_t *p_pte = pgdir_walk(pgdir, va, 0);
     if (!p_pte || !(*p_pte & PTE_P)) {
-        //cprintf("page_lookup(): no page mapped at va %p\n", va);
         return NULL;
     }
     if (pte_store)
         *pte_store = p_pte;
 
-    //cprintf("page_lookup p_pte: %p\n", p_pte);
-    //cprintf("page_lookup *p_pte: %p\n", *p_pte);
-    //cprintf("page_lookup pa: %p\n", PTE_ADDR(*p_pte));
-
-    //volatile struct PageInfo *result = pa2page(PTE_ADDR(*p_pte));
-    //cprintf("result = %p\n", result);
     return pa2page(PTE_ADDR(*p_pte));
 }
 
@@ -609,13 +568,9 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
-    //cprintf("page_remove va: %p\n", va);
     pte_t *p_pte;
     struct PageInfo *pp = page_lookup(pgdir, va, &p_pte);
-    //assert(pp != pages);
-    //cprintf("page_lookup result: %p\n", pp);
     if (!pp) {
-        //cprintf("page_remove: page %p not found\n", pp);
         return;
     }
 
@@ -669,7 +624,20 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	//panic("mmio_map_region not implemented");
+
+    physaddr_t pa_start = ROUNDDOWN(pa, PGSIZE);
+    physaddr_t pa_end = ROUNDUP(pa+size, PGSIZE);
+    physaddr_t pa_offset = pa & 0xfff;
+    uintptr_t old_base = base;
+
+    if (base + pa_end - pa_start >= MMIOLIM)
+        panic("mapping MMIO region overflows MMIOLIM");
+
+    boot_map_region(kern_pgdir, base, pa_end-pa_start-1, pa_start, PTE_W | PTE_PCD | PTE_PWT);
+    base = base + pa_end - pa_start;
+
+    return (void *) (old_base + pa_offset);
 }
 
 static uintptr_t user_mem_check_addr;
@@ -709,7 +677,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
         }
     }
 
-    for (i = va_r; i <= va_len; i += PGSIZE) {
+    for (i = va_r; i < va_len; i += PGSIZE) {
         p_pte = pgdir_walk(env->env_pgdir, i, 0);
         if (!p_pte || !(*p_pte & (perm | PTE_P))) {
             if (i == va_r)
@@ -917,7 +885,7 @@ check_kern_pgdir(void)
 	for (i = 0; i < npages * PGSIZE; i += PGSIZE)
 		assert(check_va2pa(pgdir, KERNBASE + i) == i);
 
-	// check kernel stack
+    // check kernel stack
 	// (updated in lab 4 to check per-CPU kernel stacks)
 	for (n = 0; n < NCPU; n++) {
 		uint32_t base = KSTACKTOP - (KSTKSIZE + KSTKGAP) * (n + 1);
@@ -1132,7 +1100,7 @@ check_page(void)
 	// test mmio_map_region
 	mm1 = (uintptr_t) mmio_map_region(0, 4097);
 	mm2 = (uintptr_t) mmio_map_region(0, 4096);
-	// check that they're in the right region
+    // check that they're in the right region
 	assert(mm1 >= MMIOBASE && mm1 + 8192 < MMIOLIM);
 	assert(mm2 >= MMIOBASE && mm2 + 8192 < MMIOLIM);
 	// check that they're page-aligned
